@@ -60,7 +60,7 @@ export default function BandejaPage() {
 
     const abrirWhatsApp = (telefono: string, nombre: string) => {
         const numeroLimpio = telefono.replace(/[^\d+]/g, '');
-        const mensaje = encodeURIComponent(`Hola ${nombre}, me comunico de DoSkils en respuesta a tu solicitud en nuestra web...`);
+        const mensaje = encodeURIComponent(`Hola ${nombre}, me comunico de DoSkills en respuesta a tu solicitud en nuestra web...`);
         window.open(`https://wa.me/${numeroLimpio}?text=${mensaje}`, '_blank');
     };
 

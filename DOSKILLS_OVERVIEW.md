@@ -1,6 +1,6 @@
-# 🚀 DoSkils - Gestión de Capacitaciones Digitales
+# 🚀 DoSkills - Gestión de Capacitaciones Digitales
 
-**DoSkils** es una solución integral diseñada para la digitalización y optimización de capacitaciones corporativas. Su objetivo principal es eliminar los registros en papel, automatizar reportes y garantizar el cumplimiento normativo mediante el seguimiento en tiempo real.
+**DoSkills** es una solución integral diseñada para la digitalización y optimización de capacitaciones corporativas. Su objetivo principal es eliminar los registros en papel, automatizar reportes y garantizar el cumplimiento normativo mediante el seguimiento en tiempo real.
 
 ## 🎨 Concepto Visual y Tema de Colores
 
@@ -20,7 +20,7 @@ El diseño se centra en una estética **Premium**, **Moderna** y **Profesional**
 - **Información / IA:** Tonos `Cian` y `Violeta` suaves, especialmente integrados en **Planet Bot**.
 
 ## 🤖 Planet Bot (Asistente IA)
-El asistente inteligente del proyecto, **Planet Bot**, actúa como guía interactiva. Su diseño visual utiliza una burbuja flotante con gradientes azulados y notificaciones dinámicas que refuerzan la identidad de marca de **DoSkils**.
+El asistente inteligente del proyecto, **Planet Bot**, actúa como guía interactiva. Su diseño visual utiliza una burbuja flotante con gradientes azulados y notificaciones dinámicas que refuerzan la identidad de marca de **DoSkills**.
 
 ---
 

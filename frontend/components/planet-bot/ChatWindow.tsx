@@ -62,7 +62,7 @@ export default function ChatWindow({
                     <div>
                         <h3 className="font-bold text-lg leading-tight tracking-wide">Planet Bot</h3>
                         <p className="text-[11px] text-blue-50 font-medium flex items-center gap-1 opacity-90">
-                            <Sparkles size={10} /> Soporte Inteligente DoSkils
+                            <Sparkles size={10} /> Soporte Inteligente DoSkills
                         </p>
                     </div>
                 </div>

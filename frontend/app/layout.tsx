@@ -11,7 +11,7 @@ import { Toaster } from 'sonner';
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sistema SST Digital",
+  title: "DoSkills",
   description: "Digitalización de Capacitaciones",
 };
 

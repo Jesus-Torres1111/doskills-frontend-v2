@@ -206,7 +206,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-slate-400/80 text-xs mt-6">
-          &copy; {new Date().getFullYear()} DoSkils Inc. Todos los derechos reservados.
+          &copy; {new Date().getFullYear()} DoSkills Inc. Todos los derechos reservados.
         </p>
 
         {/* PARCHE DEFINITIVO PARA AUTOFILL (EVITAR LETRAS BLANCAS) */}

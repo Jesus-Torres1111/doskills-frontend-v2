@@ -18,7 +18,7 @@ export default function AppPreview() {
                         <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-green-400/80" />
                     </div>
                     <div className="mx-auto text-[10px] md:text-xs font-medium text-gray-400/80 dark:text-gray-500 uppercase tracking-widest hidden sm:block">
-                        DoSkils DASHBOARD
+                        DoSkills DASHBOARD
                     </div>
                 </div>
 
@@ -26,7 +26,7 @@ export default function AppPreview() {
                 <div className="relative aspect-[16/10] w-full rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-950 mt-8 md:mt-10 border border-gray-200/50 dark:border-gray-800">
                     <Image
                         src="/dashboard-screenshot.webp"
-                        alt="Vista previa del Dashboard de DoSkils"
+                        alt="Vista previa del Dashboard de DoSkills"
                         fill
                         className="object-cover object-top transition-transform duration-700 group-hover:scale-[1.02]"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 80vw"

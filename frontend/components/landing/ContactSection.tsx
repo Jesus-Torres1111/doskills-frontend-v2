@@ -88,7 +88,7 @@ export default function ContactSection() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-400 dark:text-gray-500 uppercase tracking-wider font-semibold mb-1">Llámanos</p>
-                                        <p className="text-white font-medium hover:text-blue-400 transition-colors cursor-pointer">+51 987 654 321</p>
+                                        <p className="text-white font-medium hover:text-blue-400 transition-colors cursor-pointer">+51 934 587 377</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4 group/item">
@@ -97,7 +97,7 @@ export default function ContactSection() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-slate-400 dark:text-gray-500 uppercase tracking-wider font-semibold mb-1">Escríbenos</p>
-                                        <p className="text-white font-medium hover:text-emerald-400 transition-colors cursor-pointer">contacto@DoSkils.pe</p>
+                                        <p className="text-white font-medium hover:text-emerald-400 transition-colors cursor-pointer">support@nosplanet.org</p>
                                     </div>
                                 </div>
                             </div>
@@ -244,7 +244,7 @@ export default function ContactSection() {
                                                     setFocusedField(null);
                                                 }}
                                                 className={`w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-gray-800/50 border rounded-r-xl outline-none transition-all placeholder:text-slate-400 dark:text-gray-500 text-slate-900 dark:text-white ${errors.telefono ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500'}`}
-                                                placeholder="987 654 321"
+                                                placeholder="934 587 377"
                                             />
                                         </div>
                                     </div>

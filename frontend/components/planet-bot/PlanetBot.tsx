@@ -16,7 +16,7 @@ const botImage = '/Planet_bot_DoSkills.png';
 
 const DoSkills_TIPS: string[] = [
     "💡 ¿Sabías que? Digitalizar tus capacitaciones ahorra un 70% en costos logísticos.",
-    "🚀 ¡DoSkils permite crear formularios inteligentes en segundos!",
+    "🚀 ¡DoSkills permite crear formularios inteligentes en segundos!",
     "📱 Tus colaboradores pueden completar sus capacitaciones desde cualquier dispositivo.",
     "📊 Obtén reportes en tiempo real sobre el progreso de tu equipo.",
     "🔒 La seguridad de tus datos es nuestra prioridad número uno.",

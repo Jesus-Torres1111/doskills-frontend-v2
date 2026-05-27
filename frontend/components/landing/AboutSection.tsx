@@ -99,7 +99,7 @@ export default function AboutSection() {
                             Liderando la <span className="text-blue-600">Gestión de Seguridad Digital</span>
                         </h2>
                         <p className="text-lg text-slate-600 dark:text-gray-400 leading-relaxed">
-                            En <span className="font-bold text-slate-800 dark:text-gray-200">DoSkils</span>, transformamos la forma en que las empresas gestionan sus registros obligatorios.
+                            En <span className="font-bold text-slate-800 dark:text-gray-200">DoSkills</span>, transformamos la forma en que las empresas gestionan sus registros obligatorios.
                             Brindamos herramientas que permiten pasar de archivos físicos pesados a un sistema ágil, donde la información es verídica, accesible y está lista para ser presentada en cualquier momento.
                         </p>
                     </div>

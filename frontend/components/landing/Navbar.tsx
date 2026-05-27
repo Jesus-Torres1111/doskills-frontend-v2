@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, LogIn, Menu, X, Home, Users, Briefcase, Mail, Handshake, TrendingUp, Sun, Moon } from 'lucide-react';
+import { BarChart3, LogIn, Menu, X, Home, Users, Briefcase, Mail, Handshake, TrendingUp, Sun, Moon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 
@@ -56,12 +56,14 @@ export default function Navbar() {
                 <div className="flex justify-between items-center h-full">
 
                     {/* logotipo */}
-                    <Link href="/#inicio" className="shrink-0 flex items-center gap-2 cursor-pointer transition hover:opacity-80">
-                        <div className={`p-2 rounded-lg transition-colors ${isScrolled ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-white/10 text-white backdrop-blur-sm border border-white/20'}`}>
-                            <ShieldCheck size={28} />
-                        </div>
-                        <span className={`text-2xl font-bold transition-colors ${logoTextClass}`}>
-                            DoSkils
+                    <Link href="/#inicio" className="shrink-0 flex items-center gap-3 cursor-pointer transition hover:opacity-80 group">
+                        <img
+                            src="/logo-doskills.svg"
+                            alt="DoSkills Logo"
+                            className="w-10 h-10 rounded-xl shadow-lg shadow-blue-500/30 transition-transform group-hover:scale-105"
+                        />
+                        <span className={`text-2xl font-bold transition-colors tracking-wide ${logoTextClass}`}>
+                            DoSkills
                         </span>
                     </Link>
 
