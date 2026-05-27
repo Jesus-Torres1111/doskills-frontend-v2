@@ -14,15 +14,15 @@ export default function SplashScreen({ message = "Preparando tu sesión..." }: {
 
             <div className="relative flex flex-col items-center">
                 {/* Logo con animación de entrada */}
-                <div className="relative h-24 w-64 mb-10 animate-in zoom-in-95 slide-in-from-bottom-4 duration-700 delay-150">
-                    <Image
-                        src="/logo_empresa.png"
-                        alt="Logo Pampa Baja"
-                        fill
-                        className="object-contain drop-shadow-2xl"
-                        priority
-                        sizes="(max-width: 768px) 100vw, 256px"
+                <div className="flex items-center justify-center gap-4 mb-10 animate-in zoom-in-95 slide-in-from-bottom-4 duration-700 delay-150 drop-shadow-2xl">
+                    <img
+                        src="/logo-doskills.svg"
+                        alt="DoSkills Logo"
+                        className="w-16 h-16 rounded-2xl shadow-lg shadow-blue-500/20"
                     />
+                    <span className="text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                        DoSkills
+                    </span>
                 </div>
 
 

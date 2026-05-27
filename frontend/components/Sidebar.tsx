@@ -112,16 +112,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <X size={20} />
                         </button>
                     </div>
-                    <div className="relative h-16 w-44 mb-3 hover:scale-105 transition-transform duration-500 cursor-pointer">
-                        <Image
-                            src="/logo_empresa.png"
-                            alt="Logo Empresa"
-                            fill
-                            sizes="(max-width: 768px) 100vw, 200px"
-                            className="object-contain drop-shadow-sm"
-                            priority
+
+                    {/* Logo DoSkills adaptativo */}
+                    <div className="flex items-center justify-center gap-3 mb-3 hover:scale-105 transition-transform duration-500 cursor-pointer">
+                        <img
+                            src="/logo-doskills.svg"
+                            alt="DoSkills Logo"
+                            className="w-10 h-10 rounded-xl shadow-sm"
                         />
+                        <span className="text-3xl font-extrabold tracking-wide text-gray-900 dark:text-white">
+                            DoSkills
+                        </span>
                     </div>
+
                     <div className="text-center px-4">
                         <p className="text-[10px] text-blue-500/80 font-bold uppercase tracking-[0.2em] select-none">by Nos Planet</p>
                     </div>

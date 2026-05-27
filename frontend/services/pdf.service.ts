@@ -362,12 +362,24 @@ export const generarPDFUniversal = async (
 
   rightY += 15;
   doc.setFontSize(7);
-  doc.text("CODIGO DE ACTA", colRightX, rightY);
-  doc.setFontSize(9);
-  doc.text(data.codigo_acta, colRightX + 25, rightY);
-  doc.line(colRightX + 25, rightY + 1, pageWidth - marginLeft, rightY + 1);
+  // 1. Título arriba
+  doc.text("CÓDIGO DE ACTA:", colRightX, rightY);
 
-  rightY += 8;
+  rightY += 4;
+
+  // 2. Línea inferior
+  doc.line(colRightX, rightY + 1, pageWidth - marginLeft, rightY + 1);
+
+  // 3. Calculamos el punto medio exacto de la línea
+  const centerOfLineX = (colRightX + (pageWidth - marginLeft)) / 2;
+
+  // 4. Código alineado al centro
+  doc.setFontSize(8);
+  doc.text(data.codigo_acta, centerOfLineX, rightY, {
+    align: "center",
+  });
+
+  rightY += 4;
   doc.setFontSize(7);
   const h = data.total_hombres || 0;
   const m = data.total_mujeres || 0;

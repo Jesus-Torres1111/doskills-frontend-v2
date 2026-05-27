@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import Sidebar from '@/components/Sidebar';
-import { Menu, X, Moon, Sun, BellRing } from 'lucide-react';
+import { Menu, X, Moon, Sun, BellRing, Check } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/AuthContext';
 import { BandejaProvider } from '@/context/BandejaContext';
@@ -35,12 +35,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useEffect(() => {
         const checkPrefs = () => {
             const prefNotif = localStorage.getItem('pref_notif');
-            // Si es null (primera vez) o 'true', mostramos la campana
             setMostrarCampana(prefNotif === null || prefNotif === 'true');
         };
 
-        checkPrefs(); // Revisar al cargar
-        window.addEventListener('storage_pref_changed', checkPrefs); // Escuchar si cambian en el Sidebar
+        checkPrefs();
+        window.addEventListener('storage_pref_changed', checkPrefs);
 
         return () => window.removeEventListener('storage_pref_changed', checkPrefs);
     }, []);
@@ -95,23 +94,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // 🟢 FUNCIÓN: Clic principal (Marca leída y redirecciona)
     const handleNotificacionClick = async (notificacion: any) => {
-        // 1. Marcar como leída
         if (!notificacion.leida) {
             try {
                 await api.put(`/notificaciones/${notificacion.id}/leer`);
-                cargarNotificaciones();
+                cargarNotificaciones(); // Refrescamos el contador
             } catch (error) {
                 console.error("Error marcando como leída", error);
             }
         }
 
-        // 2. 🟢 REDIRECCIÓN DIRECTA (Usando la base de datos)
         if (notificacion.url_destino) {
             router.push(notificacion.url_destino);
         } else {
-            // Si la notificación es antigua y no tiene URL, lo dejamos en el dashboard
             router.push('/dashboard');
+        }
+    };
+
+    // 🟢 NUEVO: FUNCIÓN: Marcar solo una como leída (sin redireccionar)
+    const handleMarcarComoLeida = async (id: number) => {
+        try {
+            await api.put(`/notificaciones/${id}/leer`);
+            cargarNotificaciones(); // Refresca la lista y el contador localmente
+        } catch (error) {
+            console.error("Error al marcar notificación como leída", error);
+        }
+    };
+
+    // 🟢 NUEVO: FUNCIÓN: Marcar TODAS como leídas de golpe
+    const handleMarcarTodasComoLeidas = async () => {
+        try {
+            await api.put('/notificaciones/leer-todas'); // Asegúrate de crear este endpoint en tu backend
+            cargarNotificaciones(); // Vacía el contador
+        } catch (error) {
+            console.error("Error al marcar todas como leídas", error);
         }
     };
 
@@ -140,19 +157,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="flex-1 flex flex-col h-screen overflow-hidden">
 
                     <header className="flex h-16 items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-5 border-b border-gray-100/50 dark:border-gray-800 shadow-sm shrink-0 z-40 sticky top-0 transition-all duration-300">
-                        <div className="flex items-center gap-4">
-                            <div className="md:hidden relative w-24 h-8 overflow-hidden rounded-md border border-gray-100/50 dark:border-gray-800 shadow-sm">
-                                <Image
-                                    src="/logo_empresa.png"
-                                    alt="Logo Móvil"
-                                    fill
-                                    sizes="(max-width: 768px) 100px, 100px"
-                                    className="object-contain p-1 bg-white"
-                                />
-                            </div>
+                        <div className="flex items-center gap-2 md:hidden">
+                            {/* Ícono a color (sin fondos blancos forzados) */}
+                            <img
+                                src="/logo-doskills.svg"
+                                alt="DoSkills Logo Móvil"
+                                className="w-8 h-8 rounded-lg shadow-sm"
+                            />
+
+                            {/* Texto dinámico para modo claro/oscuro */}
+                            <span className="text-xl font-extrabold tracking-wide text-gray-800 dark:text-white">
+                                DoSkills
+                            </span>
                         </div>
 
-                        <div className="flex items-center gap-2 md:gap-3">
+                        <div className="flex items-center gap-2 md:gap-3 ml-auto">
                             {userRole === 'administrador' && (
                                 <>
                                     {mounted && (
@@ -182,14 +201,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                             {/* MENÚ DESPLEGABLE */}
                                             {showNotificaciones && (
                                                 <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden transform origin-top-right transition-all">
+
                                                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                                                        <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">Notificaciones</h3>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">Notificaciones</h3>
+                                                            {alertasPendientes > 0 && (
+                                                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-semibold">
+                                                                    {alertasPendientes} nuevas
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {/* BOTÓN: Marcar todas como leídas */}
                                                         {alertasPendientes > 0 && (
-                                                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-semibold">
-                                                                {alertasPendientes} nuevas
-                                                            </span>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    // Aquí debes llamar a tu función, por ejemplo:
+                                                                    handleMarcarTodasComoLeidas();
+                                                                }}
+                                                                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                                            >
+                                                                Marcar todas
+                                                            </button>
                                                         )}
                                                     </div>
+
                                                     <div className="max-h-80 overflow-y-auto">
                                                         {notificaciones.length === 0 ? (
                                                             <div className="p-6 text-center text-sm text-gray-500 flex flex-col items-center gap-2">
@@ -201,14 +237,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                                 <div
                                                                     key={notif.id}
                                                                     onClick={() => handleNotificacionClick(notif)}
-                                                                    className={`p-4 border-b border-gray-50 dark:border-gray-700/50 hover:bg-blue-50/50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors ${!notif.leida ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+                                                                    className={`group relative p-4 border-b border-gray-50 dark:border-gray-700/50 hover:bg-blue-50/50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors ${!notif.leida ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
                                                                 >
-                                                                    <p className={`text-sm leading-relaxed ${!notif.leida ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
-                                                                        {notif.mensaje}
-                                                                    </p>
-                                                                    <span className="text-xs text-gray-400 mt-2 block font-medium">
-                                                                        {new Date(notif.fecha_creacion).toLocaleDateString()} - {new Date(notif.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                                    </span>
+                                                                    <div className="pr-6">
+                                                                        <p className={`text-sm leading-relaxed ${!notif.leida ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                                            {notif.mensaje}
+                                                                        </p>
+                                                                        <span className="text-xs text-gray-400 mt-2 block font-medium">
+                                                                            {new Date(notif.fecha_creacion).toLocaleDateString()} - {new Date(notif.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* BOTÓN INDIVIDUAL: Marcar como leída */}
+                                                                    {!notif.leida && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                // Aquí debes llamar a tu función pasándole el ID, por ejemplo:
+                                                                                handleMarcarComoLeida(notif.id);
+                                                                            }}
+                                                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 opacity-0 group-hover:opacity-100 hover:bg-blue-100 dark:hover:bg-gray-600 rounded-full transition-all"
+                                                                            title="Marcar como leída"
+                                                                        >
+                                                                            <Check size={18} strokeWidth={2.5} />
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             ))
                                                         )}
