@@ -106,9 +106,11 @@ export default function LoginPage() {
           </Link>
 
           <div className="mb-8 text-center mt-2">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-5 transform rotate-3">
-              <ShieldCheck size={28} />
-            </div>
+            <img
+              src="/logo-doskills.svg"
+              alt="DoSkills Logo"
+              className="inline-block h-14 w-14 rounded-2xl shadow-lg shadow-blue-500/30 mb-5 transform rotate-3 transition-transform hover:rotate-0 duration-300"
+            />
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Bienvenido de nuevo</h1>
             <p className="mt-2 text-sm text-slate-500 font-medium">Ingresa a tu cuenta para gestionar el sistema</p>
           </div>
