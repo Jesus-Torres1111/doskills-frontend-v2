@@ -229,7 +229,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </div>
                         )}
 
-                        {userRole === 'soporte' && (
+                        {/* {userRole === 'soporte' && (
                             <>
                                 <div className="flex items-center justify-between py-2 px-4 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group" onClick={() => toggleBot('publico')}>
                                     <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -251,7 +251,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     </button>
                                 </div>
                             </>
-                        )}
+                        )} */}
                     </div>
                 </nav>
 
