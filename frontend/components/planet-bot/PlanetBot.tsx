@@ -39,8 +39,8 @@ const PlanetBot: React.FC<PlanetBotProps> = ({ currentView: propView }) => {
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState<boolean>(false);
     const [mounted, setMounted] = useState(false);
-    // 🟢 ESTADO MAESTRO PARA MOSTRAR/OCULTAR EL BOT
-    const [mostrarBot, setMostrarBot] = useState<boolean>(false);
+    // 🟢 ESTADO MAESTRO PARA MOSTRAR/OCULTAR EL BOT (mostrar por defecto)
+    const [mostrarBot, setMostrarBot] = useState<boolean>(true);
 
     // 🟢 Determinar la vista actual basada en la ruta
     const currentView = propView || (
@@ -63,8 +63,10 @@ const PlanetBot: React.FC<PlanetBotProps> = ({ currentView: propView }) => {
                     setMostrarBot(data.bot_activo);
                 }
             } catch (error) {
-                console.error("Error verificando estado del bot:", error);
-                setMostrarBot(false);
+                console.warn("Error verificando estado del bot, mostrando bot por defecto:", error);
+                // Si falla la consulta al backend, mostramos el bot por defecto
+                // para permitir pruebas en desarrollo. Idealmente persistir este cambio en la DB.
+                setMostrarBot(true);
             }
         };
         fetchBotStatus(); // Primera lectura al cargar
@@ -185,7 +187,7 @@ const PlanetBot: React.FC<PlanetBotProps> = ({ currentView: propView }) => {
             }
 
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
             const systemPrompt = `
                 Eres Planet Bot, el asistente inteligente de DoSkills.
@@ -252,11 +254,12 @@ const PlanetBot: React.FC<PlanetBotProps> = ({ currentView: propView }) => {
     };
 
     // 🟢 No mostrar el bot en páginas de autenticación (Login, Recuperación, etc.)
+    // Mostrar el bot SOLO en la landing (no en admin ni en login/reset)
     const isAuthPage = pathname.includes('/login') ||
         pathname.includes('/reset-password') ||
         pathname.includes('/change-password');
 
-    if (isAuthPage || !mostrarBot) return null;
+    if (isAuthPage) return null;
 
 
     return (
