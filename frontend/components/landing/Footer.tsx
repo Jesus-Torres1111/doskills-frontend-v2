@@ -1,15 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { BarChart3, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
+// Importaciones de redes comentadas temporalmente
+import { Mail, Phone /*, Facebook, Twitter, Linkedin, Instagram*/ } from 'lucide-react';
+import LegalModal from '@/components/ui/LegalModal';
 
-// pie de página
 export default function Footer() {
     const currentYear = new Date().getFullYear();
+    const [legalModalType, setLegalModalType] = useState<'terminos' | 'privacidad' | null>(null);
 
     return (
-        <footer className="bg-gray-900 text-gray-300 py-16">
+        <footer className="bg-gray-900 text-gray-300 py-16 relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
 
@@ -25,12 +27,16 @@ export default function Footer() {
                         <p className="text-sm leading-relaxed text-gray-400">
                             Transformamos la gestión de cumplimiento y auditoría con tecnología inteligente. Simplificamos tus procesos para que siempre estés listo ante cualquier inspección.
                         </p>
+
+                        {/* 🟢 REDES SOCIALES COMENTADAS POR AHORA */}
+                        {/* 
                         <div className="flex gap-4 pt-2">
                             <a href="#" className="text-gray-400 hover:text-blue-500 transition-all hover:-translate-y-1"><Facebook size={20} /></a>
                             <a href="#" className="text-gray-400 hover:text-blue-400 transition-all hover:-translate-y-1"><Twitter size={20} /></a>
                             <a href="#" className="text-gray-400 hover:text-blue-600 transition-all hover:-translate-y-1"><Linkedin size={20} /></a>
                             <a href="#" className="text-gray-400 hover:text-pink-500 transition-all hover:-translate-y-1"><Instagram size={20} /></a>
                         </div>
+                        */}
                     </div>
 
                     {/* enlaces rápidos */}
@@ -48,10 +54,16 @@ export default function Footer() {
                     <div>
                         <h3 className="text-white font-semibold mb-6">Legal</h3>
                         <ul className="space-y-3 text-sm">
-                            <li><a href="#" className="hover:text-blue-400 transition-colors">Términos y Condiciones</a></li>
-                            <li><a href="#" className="hover:text-blue-400 transition-colors">Política de Privacidad</a></li>
-                            <li><a href="#" className="hover:text-blue-400 transition-colors">Protección de Datos</a></li>
-                            <li><a href="#" className="hover:text-blue-400 transition-colors">Cookies</a></li>
+                            <li>
+                                <button onClick={() => setLegalModalType('terminos')} className="hover:text-blue-400 transition-colors">
+                                    Términos y Condiciones
+                                </button>
+                            </li>
+                            <li>
+                                <button onClick={() => setLegalModalType('privacidad')} className="hover:text-blue-400 transition-colors">
+                                    Política de Privacidad
+                                </button>
+                            </li>
                         </ul>
                     </div>
 
@@ -79,6 +91,11 @@ export default function Footer() {
                     </div>
                 </div>
             </div>
+
+            <LegalModal
+                type={legalModalType}
+                onClose={() => setLegalModalType(null)}
+            />
         </footer>
     );
 }

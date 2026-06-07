@@ -6,16 +6,15 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import api from '@/services/api';
 import {
-    ArrowLeft, FileSpreadsheet, AlertCircle, ChevronDown, BarChart3, Filter
+    ArrowLeft, FileSpreadsheet, AlertCircle, ChevronDown, BarChart3, Filter, Trash2, CheckCircle2
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 import { AxiosError } from 'axios';
-// 🟢 1. IMPORTAR USEAUTH
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner'; // 🟢 IMPORTAMOS SONNER
 
-// --- INTERFACES ---
 interface Worker {
     dni: string;
     apellidos: string;
@@ -33,22 +32,28 @@ interface AvanceReporte {
     avance_real: number;
     porcentaje: number;
     faltantes: Worker[];
-    tipo?: string; // Para identificar EXTERNO/INTERNO
+    tipo?: string;
 }
 
-// Interfaz para el gráfico resumen
 interface ChartData {
-    name: string;      // Será el Nombre del Área o del Tema
+    name: string;
     meta: number;
     real: number;
     porcentaje: number;
     tipo: 'INTERNO' | 'EXTERNO';
-    esResumen: boolean; // Para saber si estamos viendo Áreas o Temas
+    esResumen: boolean;
+}
+
+// 🟢 INTERFAZ PARA EL MODAL DE CONFIRMACIÓN
+interface ConfirmDialogState {
+    isOpen: boolean;
+    title: string;
+    message: string | React.ReactNode;
+    onConfirm: () => void;
 }
 
 export default function GestionPage() {
     const router = useRouter();
-    // 🟢 2. OBTENER EL USUARIO PARA SABER SI ES AUDITOR
     const { user } = useAuth();
     const esAuditor = user?.rol === 'Auditor' || user?.rol === 'auditor';
 
@@ -56,16 +61,15 @@ export default function GestionPage() {
     const [loading, setLoading] = useState(true);
     const { theme } = useTheme();
 
-    // Filtros
     const [selectedArea, setSelectedArea] = useState<string>('Todos');
-
-    // Subida
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [showUpload, setShowUpload] = useState(false);
     const [expandedId, setExpandedId] = useState<number | null>(null);
 
-    // Contexto de carga
+    // 🟢 ESTADO DEL MODAL
+    const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+
     const loadStats = async () => {
         try {
             setLoading(true);
@@ -73,6 +77,7 @@ export default function GestionPage() {
             setStats(data);
         } catch (error) {
             console.error("Error cargando reporte:", error);
+            toast.error("Error al cargar los datos del reporte.");
         } finally {
             setLoading(false);
         }
@@ -82,7 +87,6 @@ export default function GestionPage() {
         loadStats();
     }, []);
 
-    // --- 1. OBTENER LISTA DE ÁREAS ÚNICAS ---
     const uniqueAreas = useMemo(() => {
         const areasSet = new Set<string>();
         stats.forEach(s => {
@@ -95,7 +99,6 @@ export default function GestionPage() {
         return ['Todos', ...Array.from(areasSet).sort()];
     }, [stats]);
 
-    // --- 2. FILTRAR LA LISTA DE TARJETAS (ABAJO) ---
     const filteredStats = useMemo(() => {
         if (selectedArea === 'Todos') return stats;
         return stats.filter(s => {
@@ -105,10 +108,7 @@ export default function GestionPage() {
         });
     }, [stats, selectedArea]);
 
-    // --- 3. LÓGICA INTELIGENTE DEL GRÁFICO (ARRIBA) ---
     const chartData = useMemo<ChartData[]>(() => {
-
-        // CASO A: VISTA GENERAL (RESUMEN POR ÁREA)
         if (selectedArea === 'Todos') {
             const areaMap = new Map<string, { meta: number; real: number }>();
 
@@ -125,32 +125,31 @@ export default function GestionPage() {
                 });
             });
 
-            return Array.from(areaMap.entries()).map(([nombre, data]) => {
-                const esExterno = data.meta === 0;
-                let pct = 0;
+            return Array.from(areaMap.entries())
+                .filter(([_, data]) => data.meta > 0 || data.real > 0)
+                .map(([nombre, data]) => {
+                    const esExterno = data.meta === 0;
+                    let pct = 0;
 
-                if (esExterno) {
-                    pct = data.real > 0 ? 100 : 0;
-                } else {
-                    pct = data.meta > 0 ? (data.real / data.meta) * 100 : 0;
-                }
+                    if (esExterno) {
+                        pct = data.real > 0 ? 100 : 0;
+                    } else {
+                        pct = data.meta > 0 ? (data.real / data.meta) * 100 : 0;
+                    }
 
-                return {
-                    name: nombre,
-                    meta: data.meta,
-                    real: data.real,
-                    porcentaje: Number(pct.toFixed(1)),
-                    // CORRECCIÓN 1: Casteo explícito
-                    tipo: (esExterno ? 'EXTERNO' : 'INTERNO') as 'INTERNO' | 'EXTERNO',
-                    esResumen: true
-                };
-            }).sort((a, b) => {
-                if (a.tipo === b.tipo) return a.porcentaje - b.porcentaje;
-                return a.tipo === 'INTERNO' ? -1 : 1;
-            });
+                    return {
+                        name: nombre,
+                        meta: data.meta,
+                        real: data.real,
+                        porcentaje: Number(pct.toFixed(1)),
+                        tipo: (esExterno ? 'EXTERNO' : 'INTERNO') as 'INTERNO' | 'EXTERNO',
+                        esResumen: true
+                    };
+                }).sort((a, b) => {
+                    if (a.tipo === b.tipo) return a.porcentaje - b.porcentaje;
+                    return a.tipo === 'INTERNO' ? -1 : 1;
+                });
         }
-
-        // CASO B: VISTA DETALLADA (TEMAS DEL ÁREA)
         else {
             return filteredStats.map(plan => {
                 const esExterno = plan.meta_total === 0;
@@ -159,7 +158,6 @@ export default function GestionPage() {
                     meta: plan.meta_total,
                     real: plan.avance_real,
                     porcentaje: plan.porcentaje,
-                    // CORRECCIÓN 2: Casteo explícito
                     tipo: (esExterno ? 'EXTERNO' : 'INTERNO') as 'INTERNO' | 'EXTERNO',
                     esResumen: false
                 };
@@ -167,36 +165,57 @@ export default function GestionPage() {
         }
     }, [stats, filteredStats, selectedArea]);
 
-    // Altura dinámica: Si es resumen son menos barras, si es detalle son más
     const chartHeight = Math.max(400, chartData.length * (selectedArea === 'Todos' ? 40 : 60));
 
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!file) return alert("Selecciona un archivo");
+        if (!file) {
+            toast.warning("Selecciona un archivo Excel primero");
+            return;
+        }
 
         const formData = new FormData();
         formData.append('file', file);
 
         try {
             setUploading(true);
-
-            // Enviamos con la cabecera correcta
             await api.post('/gestion/plan', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
-            alert("¡Plan cargado con éxito! 📈");
+            toast.success("¡Plan cargado con éxito! 📈");
             setFile(null);
             setShowUpload(false);
-            // loadStats(); // Si tienes esta función
+            loadStats();
         } catch (error) {
             console.error(error);
             const err = error as AxiosError<{ error: string }>;
             const msg = err.response?.data?.error || "Error al subir el archivo.";
-            alert(`❌ Error: ${msg}`);
+            toast.error(`Error: ${msg}`);
         } finally {
             setUploading(false);
         }
+    };
+
+    // 🟢 NUEVO: Lógica con Modal Elegante
+    const handleVaciarPlan = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "⚠️ VACIAR PLAN ANUAL",
+            message: "Esto eliminará TODOS los temas del Plan Anual actual de tu empresa. Las capacitaciones ya ejecutadas NO se borrarán, pero el porcentaje de avance se reiniciará.\n\n¿Deseas continuar?",
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                try {
+                    setLoading(true);
+                    await api.delete('/gestion/plan');
+                    toast.success("Plan Anual eliminado correctamente.");
+                    loadStats();
+                } catch (error) {
+                    console.error(error);
+                    toast.error("Error al intentar vaciar el plan anual.");
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     const toggleExpand = (id: number) => setExpandedId(expandedId === id ? null : id);
@@ -204,7 +223,31 @@ export default function GestionPage() {
     if (loading) return <div className="p-10 text-center">Cargando Gestión...</div>;
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20">
+        <div className="max-w-6xl mx-auto space-y-6 pb-20 relative">
+
+            {/* 🟢 MODAL CONFIRMACIÓN GENÉRICO */}
+            {confirmDialog && confirmDialog.isOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-gray-100 dark:border-slate-700">
+                        <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-500">
+                            <AlertCircle size={28} />
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">{confirmDialog.title}</h3>
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed whitespace-pre-line">
+                            {confirmDialog.message}
+                        </div>
+                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
+                            <button onClick={() => setConfirmDialog(null)} className="px-5 py-2.5 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl font-bold text-sm transition-colors active:scale-95">
+                                Cancelar
+                            </button>
+                            <button onClick={confirmDialog.onConfirm} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors active:scale-95 flex items-center gap-2">
+                                <CheckCircle2 size={18} /> Sí, Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={() => router.back()} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full transition">
@@ -216,15 +259,26 @@ export default function GestionPage() {
                     </div>
                 </div>
 
-                {/* 🟢 3. OCULTAMOS EL BOTÓN SI ES AUDITOR */}
                 {!esAuditor && (
-                    <button
-                        onClick={() => setShowUpload(!showUpload)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition"
-                    >
-                        <FileSpreadsheet size={16} />
-                        {showUpload ? 'Ocultar' : 'Importar Plan'}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {stats.length > 0 && (
+                            <button
+                                onClick={handleVaciarPlan}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 font-medium text-sm transition"
+                            >
+                                <Trash2 size={16} />
+                                Eliminar Plan Anual
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => setShowUpload(!showUpload)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition"
+                        >
+                            <FileSpreadsheet size={16} />
+                            {showUpload ? 'Ocultar' : 'Importar Plan'}
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -292,73 +346,76 @@ export default function GestionPage() {
                     </div>
 
                     <div className="w-full overflow-y-auto max-h-[500px] pr-2">
-                        <div style={{ height: `${chartHeight}px` }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={chartData}
-                                    layout="vertical"
-                                    margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                    <XAxis type="number" domain={[0, 100]} hide />
-                                    <YAxis
-                                        dataKey="name"
-                                        type="category"
-                                        width={160}
-                                        tick={({ x, y, payload }) => {
-                                            // Buscamos el dato correspondiente para saber su tipo
-                                            const item = chartData.find(d => d.name === payload.value);
-                                            const isExternal = item?.tipo === 'EXTERNO';
-                                            return (
-                                                <text x={x - 10} y={y + 4} textAnchor="end" fill={isExternal ? (theme === 'dark' ? "#60a5fa" : "#2563eb") : (theme === 'dark' ? "#cbd5e1" : "#374151")} fontSize={11} fontWeight={isExternal ? "bold" : "normal"}>
-                                                    {payload.value.substring(0, 25)}{payload.value.length > 25 ? '...' : ''}
-                                                </text>
-                                            );
-                                        }}
-                                        interval={0}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: theme === 'dark' ? '#1e293b' : '#fff' }}
-                                        cursor={{ fill: theme === 'dark' ? '#334155' : '#f9fafb' }}
-                                        // CORRECCIÓN: Agregamos '?' a payload para hacerlo opcional, igual que en la librería
-                                        formatter={(
-                                            value: number | string | undefined,
-                                            name: number | string | undefined,
-                                            item: { payload?: ChartData }
-                                        ) => {
-                                            const val = value ?? 0;
-                                            // Usamos ?. para acceder de forma segura por si payload es undefined
-                                            const esExterno = item.payload?.tipo === 'EXTERNO';
+                        {chartData.length === 0 ? (
+                            <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm italic">
+                                No hay datos de metas o asistencia para mostrar.
+                            </div>
+                        ) : (
+                            <div style={{ height: `${chartHeight}px` }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={chartData}
+                                        layout="vertical"
+                                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" domain={[0, 100]} hide />
+                                        <YAxis
+                                            dataKey="name"
+                                            type="category"
+                                            width={160}
+                                            tick={({ x, y, payload }) => {
+                                                const item = chartData.find(d => d.name === payload.value);
+                                                const isExternal = item?.tipo === 'EXTERNO';
+                                                return (
+                                                    <text x={x - 10} y={y + 4} textAnchor="end" fill={isExternal ? (theme === 'dark' ? "#60a5fa" : "#2563eb") : (theme === 'dark' ? "#cbd5e1" : "#374151")} fontSize={11} fontWeight={isExternal ? "bold" : "normal"}>
+                                                        {payload.value.substring(0, 25)}{payload.value.length > 25 ? '...' : ''}
+                                                    </text>
+                                                );
+                                            }}
+                                            interval={0}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: theme === 'dark' ? '#1e293b' : '#fff' }}
+                                            cursor={{ fill: theme === 'dark' ? '#334155' : '#f9fafb' }}
+                                            formatter={(
+                                                value: number | string | undefined,
+                                                name: number | string | undefined,
+                                                item: { payload?: ChartData }
+                                            ) => {
+                                                const val = value ?? 0;
+                                                const esExterno = item.payload?.tipo === 'EXTERNO';
 
-                                            if (name === 'real') return [`${val} capacitados`, 'Avance Real'];
-                                            if (name === 'meta') {
-                                                if (esExterno) return ["N/A", "Meta (Contratista)"];
-                                                return [`${val} trabajadores`, 'Meta Acumulada'];
-                                            }
-                                            return [val, String(name)];
-                                        }}
-                                        labelStyle={{ fontWeight: 'bold', color: theme === 'dark' ? '#f8fafc' : '#1f2937' }}
-                                    />
-                                    <Legend verticalAlign="top" height={36} wrapperStyle={{ color: theme === 'dark' ? '#cbd5e1' : '#374151' }} />
+                                                if (name === 'real') return [`${val} capacitados`, 'Avance Real'];
+                                                if (name === 'meta') {
+                                                    if (esExterno) return ["N/A", "Meta (Contratista)"];
+                                                    return [`${val} trabajadores`, 'Meta Acumulada'];
+                                                }
+                                                return [val, String(name)];
+                                            }}
+                                            labelStyle={{ fontWeight: 'bold', color: theme === 'dark' ? '#f8fafc' : '#1f2937' }}
+                                        />
+                                        <Legend verticalAlign="top" height={36} wrapperStyle={{ color: theme === 'dark' ? '#cbd5e1' : '#374151' }} />
 
-                                    <Bar dataKey="meta" name="meta" stackId="a" fill={theme === 'dark' ? '#475569' : '#f3f4f6'} radius={[0, 4, 4, 0]} barSize={20} />
+                                        <Bar dataKey="meta" name="meta" stackId="a" fill={theme === 'dark' ? '#475569' : '#f3f4f6'} radius={[0, 4, 4, 0]} barSize={20} />
 
-                                    <Bar dataKey="real" name="real" stackId="b" radius={[0, 4, 4, 0]} barSize={20}>
-                                        {chartData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={entry.tipo === 'EXTERNO' ? '#3b82f6' : '#22c55e'}
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                                        <Bar dataKey="real" name="real" stackId="b" radius={[0, 4, 4, 0]} barSize={20}>
+                                            {chartData.map((entry, index) => (
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={entry.tipo === 'EXTERNO' ? '#3b82f6' : '#22c55e'}
+                                                />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* LISTA DETALLADA (ABAJO) - SIEMPRE MUESTRA LOS TEMAS FILTRADOS */}
+            {/* LISTA DETALLADA (ABAJO) */}
             <div className="space-y-4">
                 <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg mt-8">
                     {selectedArea === 'Todos' ? 'Listado Completo de Actividades' : `Actividades para: ${selectedArea}`}
@@ -386,7 +443,7 @@ export default function GestionPage() {
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-full h-2.5 max-w-md">
                                         <div
-                                            className={`h-2.5 rounded-full transition-all duration-500 ${item.meta_total === 0 ? 'bg-blue-500' : // AZUL si es Externo
+                                            className={`h-2.5 rounded-full transition-all duration-500 ${item.meta_total === 0 ? 'bg-blue-500' :
                                                 item.porcentaje >= 100 ? 'bg-green-500' :
                                                     item.porcentaje >= 50 ? 'bg-yellow-400' : 'bg-red-500'
                                                 }`}
@@ -404,23 +461,19 @@ export default function GestionPage() {
                                     <p className="text-[10px] text-gray-400 dark:text-slate-500 font-bold uppercase mb-1">Estado</p>
 
                                     {item.faltantes.length > 0 ? (
-                                        // 1. Si hay faltantes, mostramos el botón rojo de "Faltan #" sin importar la categoría
                                         <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1 rounded-md border border-red-100 dark:border-red-800/50">
                                             <AlertCircle size={14} />
                                             <span className="text-sm font-bold">Faltan {item.faltantes.length}</span>
                                         </div>
                                     ) : item.meta_total === 0 && item.avance_real > 0 ? (
-                                        // 2. Si no hay meta pero sí hubo gente (Externos/Contratistas que sí asistieron)
                                         <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-3 py-1 rounded-md border border-blue-100 dark:border-blue-800/50">
                                             <span className="text-sm font-bold">Externo / OK</span>
                                         </div>
                                     ) : item.meta_total === 0 && item.avance_real === 0 ? (
-                                        // 3. Si no hay nada de nada
                                         <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 px-3 py-1 rounded-md border border-gray-100 dark:border-slate-600">
                                             <span className="text-sm font-bold">Contratista</span>
                                         </div>
                                     ) : (
-                                        // 4. Si la meta se cumplió al 100%
                                         <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-3 py-1 rounded-md border border-green-100 dark:border-green-800/50">
                                             <span className="text-sm font-bold">Completado</span>
                                         </div>

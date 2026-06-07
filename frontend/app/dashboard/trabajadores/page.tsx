@@ -9,6 +9,7 @@ import {
     Save, X, CheckCircle2, UploadCloud, Loader2,
     ChevronLeft, ChevronRight, FileSpreadsheet, ChevronDown, Eraser, AlertCircle
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Trabajador {
     id_trabajador: number;
@@ -19,10 +20,9 @@ interface Trabajador {
     cargo: string;
     genero: string;
     firma_url?: string;
-    categoria?: string; // Agregado por si quieres mostrarlo en el futuro
+    categoria?: string;
 }
 
-// Interfaces para nuestros Modales Personalizados
 interface ConfirmDialogState {
     isOpen: boolean;
     title: string;
@@ -41,6 +41,9 @@ export default function TrabajadoresPage() {
     const [lista, setLista] = useState<Trabajador[]>([]);
     const [loading, setLoading] = useState(true);
     const [busqueda, setBusqueda] = useState('');
+
+    // 🟢 NUEVO: Estado para múltiples selecciones
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
     // Modales de UI
     const [modalOpen, setModalOpen] = useState(false);
@@ -61,6 +64,30 @@ export default function TrabajadoresPage() {
     const itemsPorPagina = 30;
 
     const { register, handleSubmit, reset, setValue, watch } = useForm<Trabajador>();
+    const watchDni = watch('dni');
+
+    // 🟢 NUEVO: Efecto para autocompletar si existe el DNI
+    useEffect(() => {
+        if (watchDni && watchDni.length === 8 && !editingId) {
+            const buscarTrabajadorInactivo = async () => {
+                try {
+                    const { data } = await api.get(`/trabajadores/${watchDni}`);
+                    if (data) {
+                        toast.info("Trabajador previo encontrado. Se autocompletaron sus datos y será reactivado al guardar.");
+                        setValue('nombres', data.nombres);
+                        setValue('apellidos', data.apellidos);
+                        setValue('cargo', data.cargo);
+                        setValue('area', data.area);
+                        setValue('genero', data.genero);
+                        // No seteamos el editingId para forzar a que la ruta de guardado pase por el upsert
+                    }
+                } catch (error) {
+                    // Si da 404, es un trabajador realmente nuevo, no hacemos nada
+                }
+            };
+            buscarTrabajadorInactivo();
+        }
+    }, [watchDni, editingId, setValue]);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Cerrar menú al hacer click fuera
@@ -86,7 +113,28 @@ export default function TrabajadoresPage() {
     };
 
     useEffect(() => { fetchTrabajadores(); }, []);
-    useEffect(() => { setPaginaActual(1); }, [busqueda]);
+    useEffect(() => {
+        setPaginaActual(1);
+        setSelectedIds([]); // Limpiar selección al buscar
+    }, [busqueda]);
+
+    // 🟢 NUEVO: Lógica de selección múltiple
+    const toggleSelection = (id: number) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const filtrados = lista.filter(t =>
+        `${t.apellidos} ${t.nombres}`.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (t.dni || "").includes(busqueda)
+    );
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filtrados.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filtrados.map(t => t.id_trabajador));
+        }
+    };
 
     // Guardar (Crear/Editar)
     const onSubmit = async (data: Trabajador) => {
@@ -113,7 +161,7 @@ export default function TrabajadoresPage() {
         setModalOpen(true);
     };
 
-    // 1. Eliminar Trabajador
+    // 1. Eliminar Trabajador Individual
     const handleDeleteClick = (t: Trabajador) => {
         setConfirmDialog({
             isOpen: true,
@@ -130,10 +178,53 @@ export default function TrabajadoresPage() {
         try {
             await api.delete(`/trabajadores/${id}`);
             setLista(prev => prev.filter(t => t.id_trabajador !== id));
+            setSelectedIds(prev => prev.filter(x => x !== id));
         } catch (error) {
             console.error(error);
             setAlertDialog({ isOpen: true, title: 'Acción Denegada', message: 'No se puede eliminar (posiblemente tiene capacitaciones asociadas).', type: 'error' });
         }
+    };
+
+    // 🟢 NUEVO: 1.1 Eliminar Múltiples Trabajadores
+    const handleEliminarVarios = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Eliminar Seleccionados",
+            message: `¿Estás seguro de que deseas eliminar permanentemente a los ${selectedIds.length} trabajadores seleccionados?\nEsta acción es irreversible.`,
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                try {
+                    await api.post('/trabajadores/eliminar-varios', { ids: selectedIds });
+                    setLista(prev => prev.filter(t => !selectedIds.includes(t.id_trabajador)));
+                    setSelectedIds([]);
+                    setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Trabajadores eliminados correctamente.', type: 'success' });
+                } catch (error) {
+                    console.error(error);
+                    setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudieron eliminar algunos trabajadores. Podrían tener capacitaciones asociadas.', type: 'error' });
+                }
+            }
+        });
+    };
+
+    // 🟢 NUEVO: 1.2 Vaciar Todo el Maestro
+    const handleVaciarClick = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "⚠️ VACIAR LISTA COMPLETA",
+            message: "Estás a punto de ELIMINAR A TODOS los trabajadores de la empresa.\n\nEsta acción NO se puede deshacer y fallará si alguno ya firmó capacitaciones.\n\n¿Deseas continuar bajo tu propio riesgo?",
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                try {
+                    await api.delete('/trabajadores/vaciar');
+                    setLista([]);
+                    setSelectedIds([]);
+                    setAlertDialog({ isOpen: true, title: 'Éxito', message: 'La lista de trabajadores ha sido vaciada.', type: 'success' });
+                } catch (error) {
+                    console.error(error);
+                    setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudo vaciar la lista. Es probable que existan actas asociadas a estos trabajadores.', type: 'error' });
+                }
+            }
+        });
     };
 
     // 2. Eliminar Firma Individual 
@@ -206,7 +297,7 @@ export default function TrabajadoresPage() {
             }
         });
 
-        e.target.value = ''; // Reset para permitir seleccionar los mismos archivos si cancela
+        e.target.value = '';
     };
 
     const ejecutarCargaMasiva = async (filesArray: File[]) => {
@@ -298,11 +389,6 @@ export default function TrabajadoresPage() {
         });
     };
 
-    // Filtrado y Paginación
-    const filtrados = lista.filter(t =>
-        `${t.apellidos} ${t.nombres}`.toLowerCase().includes(busqueda.toLowerCase()) ||
-        (t.dni || "").includes(busqueda)
-    );
     const indiceUltimoItem = paginaActual * itemsPorPagina;
     const itemsActuales = filtrados.slice(indiceUltimoItem - itemsPorPagina, indiceUltimoItem);
     const totalPaginas = Math.ceil(filtrados.length / itemsPorPagina);
@@ -312,7 +398,7 @@ export default function TrabajadoresPage() {
 
             {/* --- MODAL CONFIRMACIÓN GENÉRICO --- */}
             {confirmDialog && confirmDialog.isOpen && (
-                <div className="fixed inset-0 z-200 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-gray-100 dark:border-slate-700">
                         <div className="flex items-center gap-3 mb-4 text-blue-600 dark:text-blue-500">
                             <AlertCircle size={28} />
@@ -335,7 +421,7 @@ export default function TrabajadoresPage() {
 
             {/* --- MODAL ALERTA GENÉRICA --- */}
             {alertDialog && alertDialog.isOpen && (
-                <div className="fixed inset-0 z-200 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 flex flex-col items-center text-center border border-gray-100 dark:border-slate-700">
                         {alertDialog.type === 'success' ? (
                             <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-5 shadow-inner">
@@ -370,13 +456,21 @@ export default function TrabajadoresPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Total: <b className="text-gray-700 dark:text-gray-300">{lista.length}</b> registros.</p>
                 </div>
 
-                <div className="flex gap-3 items-center">
+                <div className="flex gap-3 items-center flex-wrap justify-center">
+
+                    {/* 🟢 NUEVO: BOTÓN VACIAR TODO */}
+                    {lista.length > 0 && selectedIds.length === 0 && (
+                        <button onClick={handleVaciarClick} className="text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 px-3 py-2 rounded-lg font-bold flex items-center gap-2 transition border border-red-200 dark:border-red-800/50 active:scale-95">
+                            <Trash2 size={18} /> <span className="hidden sm:inline">Eliminar a Todos</span>
+                        </button>
+                    )}
+
                     {/* Botón Carga Masiva Firmas */}
                     <div className="relative">
                         <input type="file" id="masivo-upload" className="hidden" multiple accept="image/*" onChange={handleCargaMasivaFirmas} disabled={subiendoMasivo} />
                         <label htmlFor="masivo-upload" title="Tip: Usa Ctrl+E para seleccionar todos los archivos" className={`cursor-pointer bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition ${subiendoMasivo ? 'opacity-50 pointer-events-none' : ''}`}>
                             {subiendoMasivo ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
-                            {subiendoMasivo ? 'Procesando...' : 'Subir Firmas'}
+                            <span className="hidden sm:inline">{subiendoMasivo ? 'Procesando...' : 'Subir Firmas'}</span>
                         </label>
                     </div>
 
@@ -409,14 +503,23 @@ export default function TrabajadoresPage() {
                 </div>
             </div>
 
-            {/* Buscador */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                <input
-                    type="text" placeholder="Buscar por DNI o Nombre..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm transition-all"
-                    value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                />
+            {/* Buscador Y ACCIONES MÚLTIPLES */}
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                <div className="relative w-full md:max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                    <input
+                        type="text" placeholder="Buscar por DNI o Nombre..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm transition-all"
+                        value={busqueda} onChange={e => setBusqueda(e.target.value)}
+                    />
+                </div>
+
+                {/* 🟢 NUEVO: BOTÓN ELIMINAR MÚLTIPLES (Solo si hay seleccionados) */}
+                {selectedIds.length > 0 && (
+                    <button onClick={handleEliminarVarios} className="w-full md:w-auto bg-red-600 text-white px-5 py-2.5 rounded-xl hover:bg-red-700 font-bold flex items-center justify-center gap-2 transition shadow-md shadow-red-500/20 active:scale-95 animate-in fade-in">
+                        <Trash2 size={18} /> Eliminar Seleccionados ({selectedIds.length})
+                    </button>
+                )}
             </div>
 
             {/* LISTA / TABLA */}
@@ -427,26 +530,51 @@ export default function TrabajadoresPage() {
                     <>
                         {/* --- VISTA MÓVIL (TARJETAS) --- */}
                         <div className="grid grid-cols-1 gap-4 md:hidden">
+                            {/* Opcion Select All Movil */}
+                            {filtrados.length > 0 && (
+                                <div className="flex items-center gap-3 px-2">
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        checked={selectedIds.length === filtrados.length && filtrados.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                    <span className="text-sm font-bold text-gray-600 dark:text-gray-300">Seleccionar todos en esta búsqueda</span>
+                                </div>
+                            )}
+
                             {itemsActuales.map(t => (
-                                <div key={t.id_trabajador} className="bg-white dark:bg-slate-800/90 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 relative overflow-hidden group">
-                                    <div className="flex justify-between items-start gap-2">
+                                <div key={t.id_trabajador} className={`bg-white dark:bg-slate-800/90 p-5 rounded-2xl shadow-sm border ${selectedIds.includes(t.id_trabajador) ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-gray-100 dark:border-slate-700'} flex flex-col gap-3 relative overflow-hidden transition-all`}>
+
+                                    {/* 🟢 NUEVO: Checkbox Móvil */}
+                                    <div className="absolute top-4 right-4 z-10">
+                                        <input
+                                            type="checkbox"
+                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shadow-sm"
+                                            checked={selectedIds.includes(t.id_trabajador)}
+                                            onChange={() => toggleSelection(t.id_trabajador)}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between items-start gap-2 pr-8">
                                         <div className="flex flex-col">
                                             <span className="font-mono text-blue-600 dark:text-blue-400 font-bold text-sm bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md self-start mb-1 border border-blue-100 dark:border-blue-800/50">{t.dni}</span>
                                             <h4 className="font-bold text-gray-800 dark:text-gray-100 text-base leading-tight">
                                                 {t.apellidos} {t.nombres}
                                             </h4>
                                         </div>
-                                        <div className="flex shrink-0">
-                                            {t.firma_url ? (
-                                                <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2.5 py-1 rounded-xl text-xs font-bold border border-green-100 dark:border-green-800/50 shadow-sm">
-                                                    <CheckCircle2 size={12} /> Firma
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-slate-700 px-2.5 py-1 rounded-xl text-xs font-bold border border-gray-100 dark:border-slate-600">
-                                                    Sin Firma
-                                                </span>
-                                            )}
-                                        </div>
+                                    </div>
+
+                                    <div className="flex shrink-0">
+                                        {t.firma_url ? (
+                                            <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2.5 py-1 rounded-xl text-xs font-bold border border-green-100 dark:border-green-800/50 shadow-sm">
+                                                <CheckCircle2 size={12} /> Firma
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-slate-700 px-2.5 py-1 rounded-xl text-xs font-bold border border-gray-100 dark:border-slate-600">
+                                                Sin Firma
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-col gap-1.5 mt-1 border-t border-gray-50 dark:border-slate-700/50 pt-3">
@@ -485,7 +613,17 @@ export default function TrabajadoresPage() {
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50/80 dark:bg-slate-800/80 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-100 dark:border-slate-700 uppercase tracking-wider text-[11px]">
                                     <tr>
-                                        <th className="px-6 py-4 rounded-tl-xl whitespace-nowrap">DNI</th>
+                                        {/* 🟢 NUEVO: Cabecera Checkbox */}
+                                        <th className="px-6 py-4 rounded-tl-xl whitespace-nowrap w-10 text-center">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                checked={selectedIds.length === filtrados.length && filtrados.length > 0}
+                                                onChange={toggleSelectAll}
+                                                title="Seleccionar todos"
+                                            />
+                                        </th>
+                                        <th className="px-6 py-4 whitespace-nowrap">DNI</th>
                                         <th className="px-6 py-4 whitespace-nowrap">Apellidos y Nombres</th>
                                         <th className="px-6 py-4 whitespace-nowrap">Cargo / Área</th>
                                         <th className="px-6 py-4 text-center whitespace-nowrap">Firma</th>
@@ -494,7 +632,16 @@ export default function TrabajadoresPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100/60 dark:divide-slate-700/60">
                                     {itemsActuales.map(t => (
-                                        <tr key={t.id_trabajador} className="hover:bg-blue-50/30 dark:hover:bg-slate-700/40 transition-colors group">
+                                        <tr key={t.id_trabajador} className={`${selectedIds.includes(t.id_trabajador) ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'hover:bg-blue-50/30 dark:hover:bg-slate-700/40'} transition-colors group`}>
+                                            {/* 🟢 NUEVO: Fila Checkbox */}
+                                            <td className="px-6 py-4 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                    checked={selectedIds.includes(t.id_trabajador)}
+                                                    onChange={() => toggleSelection(t.id_trabajador)}
+                                                />
+                                            </td>
                                             <td className="px-6 py-4 font-mono text-blue-600 dark:text-blue-400 font-bold">{t.dni}</td>
                                             <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">{t.apellidos} {t.nombres}</td>
                                             <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
@@ -553,7 +700,7 @@ export default function TrabajadoresPage() {
             {/* MODAL EXCEL */}
             {
                 modalExcelOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-gray-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -565,9 +712,9 @@ export default function TrabajadoresPage() {
                             <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-4 rounded-xl text-sm mb-6 border border-blue-100 dark:border-blue-800/50">
                                 <p className="font-bold mb-1">Instrucciones:</p>
                                 <ul className="list-disc pl-4 space-y-1">
-                                    <li>Sube el reporte de Nisira (CSV o Excel).</li>
-                                    <li>El sistema limpiará y unirá las líneas rotas automáticamente.</li>
-                                    <li>Actualizará DNI, Nombres, Cargo, Área y Categoría (EDS, CIFHS).</li>
+                                    <li>Sube el reporte de tu empresa (CSV o Excel).</li>
+                                    <li>El sistema no duplicará si el DNI ya existe.</li>
+                                    <li>Actualizará DNI, Nombres, Cargo, Área y Categoría.</li>
                                 </ul>
                             </div>
 
@@ -590,7 +737,7 @@ export default function TrabajadoresPage() {
             {/* MODAL INDIVIDUAL */}
             {
                 modalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in fade-in zoom-in duration-200 border border-gray-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">

@@ -23,11 +23,18 @@ export const AlertasProvider = ({ children }: { children: React.ReactNode }) => 
         // Solo el administrador procesa las alertas de usuarios
         if (user?.rol?.trim().toLowerCase() !== 'administrador') return;
 
+        // 🟢 FIX: Evitar peticiones fantasma si no hay token en el navegador
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
         try {
             const response = await api.get('/usuarios/solicitudes');
             setAlertasPendientes(response.data.length);
-        } catch (error) {
-            console.error("Error al consultar las alertas en segundo plano", error);
+        } catch (error: any) {
+            // Silenciamos el error si es simplemente un token expirado (401)
+            if (error.response?.status !== 401) {
+                console.error("Error al consultar las alertas en segundo plano", error);
+            }
         }
     };
 

@@ -10,6 +10,7 @@ import api from '@/services/api';
 import { AxiosError } from 'axios';
 
 import AnimatedLoginBackground from '@/components/ui/AnimatedLoginBackground';
+import LegalModal from '@/components/ui/LegalModal'; // 🟢 Importamos el componente legal
 
 type LoginFormInputs = {
   usuario: string;
@@ -29,6 +30,9 @@ export default function LoginPage() {
   const [showModal, setShowModal] = useState(false);
   const [recoveryUser, setRecoveryUser] = useState('');
   const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  // 🟢 ESTADO PARA EL MODAL LEGAL
+  const [legalModalType, setLegalModalType] = useState<'terminos' | 'privacidad' | null>(null);
 
   // 🟢 CORRECCIÓN: Cargar usuario recordado asegurando que el form lo registre
   useEffect(() => {
@@ -204,6 +208,27 @@ export default function LoginPage() {
                 'Iniciar Sesión'
               )}
             </button>
+
+            {/* 🟢 AVISO LEGAL DEBAJO DEL BOTÓN */}
+            <p className="text-center text-[11px] text-slate-500 pt-2 leading-relaxed">
+              Al iniciar sesión, aceptas nuestros <br/>
+              <button 
+                type="button" 
+                onClick={() => setLegalModalType('terminos')} 
+                className="font-bold text-blue-600 hover:underline"
+              >
+                Términos y Condiciones
+              </button>
+              {' '}y la{' '}
+              <button 
+                type="button" 
+                onClick={() => setLegalModalType('privacidad')} 
+                className="font-bold text-blue-600 hover:underline"
+              >
+                Política de Privacidad
+              </button>.
+            </p>
+
           </form>
         </div>
 
@@ -224,6 +249,12 @@ export default function LoginPage() {
             }
         `}} />
       </div>
+
+      {/* 🟢 LLAMAMOS AL MODAL LEGAL AQUÍ */}
+      <LegalModal 
+        type={legalModalType} 
+        onClose={() => setLegalModalType(null)} 
+      />
 
       {/* MODAL DE RECUPERACIÓN - Refinado con Animación */}
       {showModal && (
