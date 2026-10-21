@@ -1,145 +1,139 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowRight, PlayCircle, BarChart3, Users, CheckCircle, Shield } from 'lucide-react';
+import { ArrowRight, PlayCircle, Shield, Lock, User, CheckCircle2, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
-// sección principal
 export default function Hero() {
+    const [usuario, setUsuario] = useState('');
+    const [contrasena, setContrasena] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { login } = useAuth();
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!usuario || !contrasena) {
+            toast.error("Por favor, ingresa tu usuario y contraseña");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await login(usuario, contrasena);
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || String(error) || "Error al iniciar sesión");
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div id="inicio" className="relative pt-24 pb-40 lg:pt-36 lg:pb-64 overflow-hidden">
+        <div id="inicio" className="relative min-h-screen flex items-center pt-20 pb-16 overflow-hidden bg-[#0A1128]">
+            {/* Fondo azul marino sólido con gradiente sutil como en la captura */}
+            <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#050A1F] via-[#0A1128] to-[#0D1838]"></div>
 
-            {/* imagen de fondo */}
-            <div className="absolute inset-0 z-0">
-                <Image
-                    src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
-                    alt="Equipo Corporativo Analizando Datos"
-                    fill
-                    className="object-cover"
-                    priority
-                />
-                {/* superposición oscura */}
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/95 to-slate-900/40"></div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-
-                    {/* texto principal */}
-                    <div className="text-left animate-in fade-in slide-in-from-left-8 duration-700">
-                        {/* título */}
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 leading-tight">
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                                Gestión Digital de Capacitaciones
-                            </span>
+            <div className="max-w-[1400px] w-full mx-auto px-6 sm:px-8 lg:px-12 relative z-20">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+                    
+                    {/* COLUMNA IZQUIERDA: Propuesta de Valor V2 */}
+                    <div className="lg:col-span-7 text-left animate-in fade-in slide-in-from-left-8 duration-700 pr-0 lg:pr-10">
+                        {/* Píldora superior */}
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1A2649] text-[#60A5FA] text-[11px] font-bold mb-8 border border-[#2A3B69] uppercase tracking-widest">
+                            <Shield size={14} className="text-[#60A5FA]" /> Menos gestión. Más crecimiento.
+                        </div>
+                        
+                        {/* Título principal */}
+                        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-white mb-6 leading-[1.1]">
+                            Aprende. Conecta.<br />
+                            <span className="text-[#3B82F6]">Evoluciona.</span>
                         </h1>
-
-                        {/* descripción */}
-                        <p className="mt-4 text-xl text-slate-300 mb-8 leading-relaxed max-w-lg">
-                            Gestiona tus registros de forma digital y genera reportes automáticos al instante. Asegura el cumplimiento total de tus capacitaciones con reportes listos para exportar en Excel y PDF.
+                        
+                        {/* Párrafo descriptivo */}
+                        <p className="mt-6 text-[17px] text-[#94A3B8] mb-10 leading-relaxed max-w-xl font-medium">
+                            De la formación al cumplimiento. De los datos a la acción. Centraliza tu gestión de SST con evidencias verificables en tiempo real.
                         </p>
 
-                        {/* botones */}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-start items-start">
-                            <Link
-                                href="/login"
-                                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-blue-600 rounded-lg shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700 hover:scale-[1.02]"
-                            >
-                                Iniciar Ahora
-                                <ArrowRight size={18} />
-                            </Link>
-
-                            <button className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-slate-200 border border-slate-600 rounded-lg hover:bg-white/10 transition-all">
-                                <PlayCircle size={18} />
-                                Ver Demo
-                            </button>
+                        {/* Píldoras de beneficios inferiores */}
+                        <div className="flex flex-wrap gap-4">
+                            <span className="flex items-center gap-2 text-sm text-[#94A3B8] bg-[#131C3B] border border-[#1E293B] px-5 py-2.5 rounded-xl font-medium">
+                                <CheckCircle2 size={18} className="text-[#10B981]" /> Plan de capacitación
+                            </span>
+                            <span className="flex items-center gap-2 text-sm text-[#94A3B8] bg-[#131C3B] border border-[#1E293B] px-5 py-2.5 rounded-xl font-medium">
+                                <CheckCircle2 size={18} className="text-[#10B981]" /> Evidencias conectadas
+                            </span>
+                            <span className="flex items-center gap-2 text-sm text-[#94A3B8] bg-[#131C3B] border border-[#1E293B] px-5 py-2.5 rounded-xl font-medium">
+                                <CheckCircle2 size={18} className="text-[#10B981]" /> Brechas visibles
+                            </span>
                         </div>
                     </div>
 
-                    {/* demostración flotante */}
-                    <div className="relative hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-200">
-                        {/* contenedor con perspectiva */}
-                        <div className="relative rounded-xl border border-white/20 bg-slate-900/80 backdrop-blur-md p-2 shadow-2xl shadow-blue-900/20 transform rotate-y-[-5deg] hover:rotate-0 transition-transform duration-500">
+                    {/* COLUMNA DERECHA: Tarjeta de Acceso V2 Blanca */}
+                    <div className="lg:col-span-5 relative animate-in fade-in slide-in-from-right-8 duration-1000 delay-200 flex justify-end">
+                        <div className="bg-white rounded-3xl p-10 shadow-2xl w-full max-w-[480px] relative">
+                            {/* Insignia Prueba azul brillante */}
+                            <div className="absolute top-0 right-0 bg-[#2563EB] text-white text-[10px] font-bold uppercase tracking-widest px-5 py-2 rounded-bl-xl rounded-tr-3xl shadow-sm">
+                                Prueba de 15 días · Sin suscripción
+                            </div>
 
-                            {/* interfaz limpia */}
-                            <div className="grid grid-cols-4 gap-4 p-6 min-h-[400px]">
-                                {/* barra lateral */}
-                                <div className="col-span-1 space-y-4 border-r border-white/5 pr-4">
-                                    <div className="h-8 w-8 rounded-lg bg-blue-600 mb-6"></div>
-                                    <div className="h-2 w-full rounded bg-slate-700/50"></div>
-                                    <div className="h-2 w-3/4 rounded bg-slate-700/50"></div>
-                                    <div className="h-2 w-5/6 rounded bg-slate-700/50"></div>
+                            <div className="mb-8 mt-6 text-center">
+                                <h2 className="text-3xl font-extrabold text-[#111827] mb-3">Bienvenido a DoSkills</h2>
+                                <p className="text-[13px] text-[#6B7280] font-medium leading-relaxed px-4">
+                                    Automatiza tus capacitaciones y reduce costos en tu organización.
+                                </p>
+                            </div>
 
-                                    <div className="mt-auto pt-12">
-                                        <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                                            <div className="h-1.5 w-1/2 bg-blue-400 rounded mb-2"></div>
-                                            <div className="h-1 w-full bg-blue-900 rounded-full overflow-hidden">
-                                                <div className="h-full w-[85%] bg-blue-400"></div>
-                                            </div>
-                                        </div>
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-[#6B7280] uppercase tracking-widest mb-2">Usuario o Correo</label>
+                                    <div className="relative">
+                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={18} />
+                                        <input 
+                                            type="text" 
+                                            value={usuario}
+                                            onChange={(e) => setUsuario(e.target.value)}
+                                            className="w-full bg-white border border-[#E5E7EB] rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all text-[#111827] placeholder:text-[#9CA3AF]"
+                                            placeholder="Ingresa tu usuario"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-[11px] font-bold text-[#6B7280] uppercase tracking-widest">Contraseña</label>
+                                        <Link href="/recuperar" className="text-[11px] font-bold text-[#2563EB] hover:text-[#1D4ED8] transition-colors">¿Olvidaste tu contraseña?</Link>
+                                    </div>
+                                    <div className="relative">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={18} />
+                                        <input 
+                                            type="password" 
+                                            value={contrasena}
+                                            onChange={(e) => setContrasena(e.target.value)}
+                                            className="w-full bg-white border border-[#E5E7EB] rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all text-[#111827] placeholder:text-[#9CA3AF]"
+                                            placeholder="••••••••"
+                                        />
                                     </div>
                                 </div>
 
-                                {/* área de contenido */}
-                                <div className="col-span-3 space-y-6">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <div className="h-6 w-32 bg-slate-700/50 rounded"></div>
-                                        <div className="flex gap-2">
-                                            <div className="h-8 w-8 rounded-full bg-slate-700/50"></div>
-                                            <div className="h-8 w-8 rounded-full bg-slate-700/50"></div>
-                                        </div>
-                                    </div>
+                                <button 
+                                    type="submit" 
+                                    disabled={isLoading}
+                                    className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-2xl py-4 font-bold transition-all flex justify-center items-center gap-2 active:scale-95 disabled:opacity-70 mt-2"
+                                >
+                                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : 'Iniciar sesión'}
+                                </button>
+                            </form>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-slate-800/50 p-4 rounded-lg border border-white/5">
-                                            <BarChart3 className="text-emerald-400 mb-2 h-5 w-5" />
-                                            <div className="h-4 w-12 bg-slate-700 rounded mb-1"></div>
-                                            <div className="h-2 w-16 bg-slate-700/50 rounded"></div>
-                                        </div>
-                                        <div className="bg-slate-800/50 p-4 rounded-lg border border-white/5">
-                                            <Users className="text-blue-400 mb-2 h-5 w-5" />
-                                            <div className="h-4 w-12 bg-slate-700 rounded mb-1"></div>
-                                            <div className="h-2 w-16 bg-slate-700/50 rounded"></div>
-                                        </div>
-                                    </div>
-
-                                    {/* lista de registros */}
-                                    <div className="space-y-3 pt-2">
-                                        {[1, 2, 3].map((i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-8 w-8 rounded-full bg-slate-700"></div>
-                                                    <div>
-                                                        <div className="h-2 w-24 bg-slate-600 rounded mb-1"></div>
-                                                        <div className="h-1.5 w-16 bg-slate-700 rounded"></div>
-                                                    </div>
-                                                </div>
-                                                <div className="px-2 py-1 bg-green-500/20 rounded text-green-400 text-[10px] font-bold">
-                                                    APROBADO
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            <div className="mt-5 flex flex-col gap-4">
+                                <Link href="/registro" className="w-full flex items-center justify-center gap-2 bg-[#F9FAFB] hover:bg-[#F3F4F6] text-[#111827] rounded-2xl py-4 font-bold border border-[#E5E7EB] transition-all active:scale-95">
+                                    Regístrate <ArrowRight size={18} />
+                                </Link>
+                                <button className="w-full flex items-center justify-center gap-2 text-[#6B7280] hover:text-[#374151] py-2 font-bold text-[13px] transition-colors">
+                                    <PlayCircle size={18} /> Ver demo
+                                </button>
                             </div>
                         </div>
-
-                        {/* tarjeta flotante */}
-                        <div className="absolute -bottom-12 -left-8 w-48 bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-2xl animate-bounce duration-[4000ms]">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400"><Shield size={20} /></div>
-                                <div className="text-xs font-bold text-white">Seguridad</div>
-                            </div>
-                            <div className="h-1.5 w-full bg-slate-700 rounded-full mb-1">
-                                <div className="h-full w-full bg-blue-500 rounded-full animate-pulse"></div>
-                            </div>
-                            <div className="text-[10px] text-slate-400 text-right">100% Verificado</div>
-                        </div>
-
                     </div>
+
                 </div>
-
             </div>
         </div>
     );
