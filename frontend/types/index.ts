@@ -4,6 +4,7 @@ export interface Usuario {
   id?: number;
   id_usuario: number;
   id_empresa?: number; // 🟢 NUEVO: Soporte para Multitenancy
+  empresa?: string;    // 🟢 NUEVO: Nombre de la empresa para la UI (Quita la línea roja)
   nombre: string;
   usuario: string;
   rol: string;

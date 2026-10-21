@@ -137,6 +137,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <span>Inicio</span>
                     </Link>
 
+                    <Link href="/dashboard/configuracion" className={linkClass('/dashboard/configuracion')} onClick={handleLinkClick}>
+    <Building2 size={20} className="transition-transform group-hover:scale-110" />
+    <span>Configuración</span>
+</Link>
+
                     {/* 🟢 MENÚ OPERATIVO (SOLO CLIENTES) */}
                     {userRole !== 'soporte' && (
                         <>
