@@ -1,427 +1,336 @@
-// frontend/app/dashboard/usuarios/page.tsx
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { UserPlus, Trash2, X, Save, Shield, User, Lock, Pencil, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Shield, UserPlus, Pencil, Trash2, Mail, X, Save, CheckCircle2, Loader2, Building2, Box, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
 import api from '@/services/api';
-import { AxiosError } from 'axios';
 
-interface UsuarioData {
-    id_usuario: number;
-    nombre: string; // 🟢 CORREGIDO: Antes era nombre_completo, pero el backend devuelve 'nombre'
-    usuario: string;
-    email?: string;
-    rol: string;
-    estado: boolean;
-}
+export default function RolesPermisosPage() {
+    const { user } = useAuth();
+    
+    // --- ESTADOS DINÁMICOS (Sin interfaces falsas) ---
+    const [usuarios, setUsuarios] = useState<any[]>([]);
+    const [sedes, setSedes] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-interface ErrorResponse {
-    error: string;
-}
-
-export default function UsuariosPage() {
-    const { user, loading, actualizarUserSesion } = useAuth();
-    const router = useRouter();
-
-    const [listaUsuarios, setListaUsuarios] = useState<UsuarioData[]>([]);
-    const [loadingData, setLoadingData] = useState(true);
-
-    // Estados para Modales Principales
+    // --- ESTADOS DE UI ---
     const [showModal, setShowModal] = useState(false);
-    const [modoEdicion, setModoEdicion] = useState(false);
-    const [usuarioAEditar, setUsuarioAEditar] = useState<number | null>(null);
-
-    // 🟢 NUEVO: Estados para Modales de Confirmación (Alertas Profesionales)
+    const [editingId, setEditingId] = useState<number | null>(null);
     const [userToDelete, setUserToDelete] = useState<number | null>(null);
-    const [userToReset, setUserToReset] = useState<string | null>(null);
 
+    // --- FORMULARIO V2 ---
     const [formData, setFormData] = useState({
-        nombre: '', // 🟢 CORREGIDO
-        usuario: '',
+        rol: 'Capacitador',
         email: '',
-        password: '',
-        rol: 'Auditor',
+        nombres: '',
+        apellidos: '',
+        cargo: '',
+        area: '',
+        id_sede: '',
+        id_alcance: '',
         estado: true
     });
 
-    const [showInviteModal, setShowInviteModal] = useState(false);
-    const [inviteData, setInviteData] = useState({
-        email: '',
-        rol: 'Supervisor'
-    });
-
-    const cargarUsuarios = async () => {
+    // --- CARGA DE DATOS ---
+    const fetchData = async () => {
         try {
-            const { data } = await api.get('/usuarios');
-            setListaUsuarios(data);
+            const [resUsers, resSedes] = await Promise.all([
+                api.get('/usuarios').catch(() => ({ data: [] })),
+                api.get('/sedes/detalle').catch(() => ({ data: [] }))
+            ]);
+            setUsuarios(resUsers.data);
+            setSedes(resSedes.data);
         } catch (error) {
-            console.error("Error cargando usuarios", error);
+            console.error("Error cargando accesos:", error);
         } finally {
-            setLoadingData(false);
+            setIsLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (!loading) {
-            if (!user || user.rol.toLowerCase() !== 'administrador') {
-                router.push('/dashboard');
-            } else {
-                cargarUsuarios();
-            }
-        }
-    }, [user, loading, router]);
+    useEffect(() => { fetchData(); }, []);
 
-    const handleFinalInvite = async () => {
-        const id = toast.loading("Enviando invitación...");
-        try {
-            await api.post('/auth/invitar', {
-                email: inviteData.email,
-                rol: inviteData.rol
+    // --- DERIVADOS ---
+    const sedeSeleccionada = sedes.find(s => s.id_sede?.toString() === formData.id_sede);
+    const alcancesDisponibles = sedeSeleccionada?.alcances || [];
+
+    // --- MANEJADORES ---
+    const handleOpenModal = (usuarioToEdit: any = null) => {
+        if (usuarioToEdit) {
+            setEditingId(usuarioToEdit.id_usuario);
+            setFormData({
+                rol: usuarioToEdit.rol || 'Capacitador',
+                email: usuarioToEdit.email || '',
+                nombres: usuarioToEdit.nombres || usuarioToEdit.nombre || '',
+                apellidos: usuarioToEdit.apellidos || '',
+                cargo: usuarioToEdit.cargo || '',
+                area: usuarioToEdit.area || '',
+                id_sede: usuarioToEdit.id_sede?.toString() || '',
+                id_alcance: usuarioToEdit.id_alcance?.toString() || '',
+                estado: usuarioToEdit.estado !== false
             });
-            toast.success("¡Invitación enviada con éxito! 📧", { id });
-            setShowInviteModal(false);
-        } catch (error: any) {
-            console.error(error);
-            toast.error(error.response?.data?.error || "Error al procesar la invitación", { id });
+        } else {
+            setEditingId(null);
+            setFormData({ rol: 'Capacitador', email: '', nombres: '', apellidos: '', cargo: '', area: '', id_sede: '', id_alcance: '', estado: true });
         }
-    };
-
-    const abrirModalCrear = () => {
-        setModoEdicion(false);
-        setUsuarioAEditar(null);
-        setFormData({ nombre: '', usuario: '', email: '', password: '', rol: 'Auditor', estado: true });
         setShowModal(true);
-    };
-
-    const abrirModalEditar = (usuario: any) => {
-        setModoEdicion(true);
-        setUsuarioAEditar(usuario.id_usuario);
-        setFormData({
-            nombre: usuario.nombre, // 🟢 CORREGIDO
-            usuario: usuario.usuario,
-            email: usuario.email || '',
-            password: '',
-            rol: usuario.rol,
-            estado: usuario.estado
-        });
-        setShowModal(true);
-    };
-
-    // 🟢 NUEVO: Lógica confirmación eliminar profesional
-    const confirmEliminar = async () => {
-        if (!userToDelete) return;
-        try {
-            await api.delete(`/usuarios/${userToDelete}`);
-            toast.success("Usuario eliminado correctamente 🗑️");
-            cargarUsuarios();
-        } catch (error) {
-            const err = error as AxiosError<ErrorResponse>;
-            toast.error(err.response?.data?.error || "Error al eliminar");
-        } finally {
-            setUserToDelete(null);
-        }
-    };
-
-    // 🟢 NUEVO: Lógica confirmación reseteo profesional
-    const confirmReset = async () => {
-        if (!userToReset) return;
-        const id = toast.loading("Enviando correo de recuperación...");
-        try {
-            await api.post('/auth/recuperar', { usuario: userToReset });
-            toast.success("Correo enviado con éxito 📧", { id });
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || "Error al enviar el correo", { id });
-        } finally {
-            setUserToReset(null);
-        }
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const val = e.target.name === 'estado' ? (e.target as HTMLSelectElement).value === 'true' : e.target.value;
-        setFormData({ ...formData, [e.target.name]: val });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.nombre || !formData.usuario) {
-            toast.error("Nombre y Usuario son obligatorios");
-            return;
-        }
-
+        setIsSubmitting(true);
         try {
-            if (modoEdicion && usuarioAEditar) {
-                await api.put(`/usuarios/${usuarioAEditar}`, formData);
-
-                if (user?.id_usuario == usuarioAEditar) {
-                    actualizarUserSesion({
-                        nombre: formData.nombre,
-                        usuario: formData.usuario,
-                        email: formData.email,
-                        rol: formData.rol
-                    });
-                }
-                toast.success("Usuario actualizado correctamente ✅");
+            if (editingId) {
+                await api.put(`/usuarios/${editingId}`, formData);
+                toast.success("Permisos de usuario actualizados");
             } else {
                 await api.post('/usuarios', formData);
-                toast.success("Usuario creado con éxito 🎉");
+                toast.success("Usuario invitado/creado con éxito");
             }
             setShowModal(false);
-            cargarUsuarios();
-        } catch (error) {
-            const err = error as AxiosError<ErrorResponse>;
-            toast.error(err.response?.data?.error || "Error al guardar usuario");
+            fetchData();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al guardar los permisos");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    if (loading) return <div className="p-8">Verificando permisos...</div>;
-    if (user?.rol.toLowerCase() !== 'administrador') return null;
+    const confirmEliminar = async () => {
+        if (!userToDelete) return;
+        try {
+            await api.delete(`/usuarios/${userToDelete}`);
+            toast.success("Acceso revocado correctamente");
+            setUserToDelete(null);
+            fetchData();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al eliminar");
+        }
+    };
+
+    const handleReenviarInvitacion = async (email: string) => {
+        const idToast = toast.loading("Enviando correo de acceso...");
+        try {
+            await api.post('/auth/recuperar', { usuario: email });
+            toast.success("Correo enviado", { id: idToast });
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al enviar correo", { id: idToast });
+        }
+    };
+
+    if (isLoading) return <div className="p-10 flex justify-center text-blue-600"><Loader2 className="animate-spin" size={32} /></div>;
 
     return (
-        <div className="space-y-6 relative pb-20">
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div className="space-y-6 relative pb-20 animate-in fade-in duration-500">
+            
+            {/* ENCABEZADO */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestión de Usuarios</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Administra quién tiene acceso al sistema.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Shield className="text-blue-600" /> Configuración de Roles y Permisos
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Administra quién tiene acceso al sistema y qué datos puede ver.</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => {
-                            setInviteData({ email: '', rol: 'Supervisor' });
-                            setShowInviteModal(true);
-                        }}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 font-bold active:scale-95"
-                    >
-                        <Mail size={18} /> Invitar Colaborador
-                    </button>
-                    <button
-                        onClick={abrirModalCrear}
-                        className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition font-bold active:scale-95"
-                    >
-                        <UserPlus size={18} /> Nuevo Usuario
-                    </button>
-                </div>
+                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 font-bold active:scale-95">
+                    <UserPlus size={18} /> Añadir Rol / Usuario
+                </button>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-                <div className="overflow-hidden">
-                    {loadingData ? (
-                        <div className="p-8 text-center text-gray-400">Cargando datos...</div>
-                    ) : listaUsuarios.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400">No hay usuarios registrados.</div>
-                    ) : (
-                        <>
-                            {/* VISTA MÓVIL */}
-                            <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
-                                {listaUsuarios.map((u, index) => (
-                                    <div key={u.id_usuario} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3">
-                                        <div className="flex justify-between items-start">
+            {/* TABLA DE ROLES V2 */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50 dark:bg-slate-800/80 text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold border-b dark:border-slate-700">
+                            <tr>
+                                <th className="px-6 py-4">Usuario</th>
+                                <th className="px-6 py-4">Cargo / Área</th>
+                                <th className="px-6 py-4">Rol Asignado</th>
+                                <th className="px-6 py-4">Alcance Operativo</th>
+                                <th className="px-6 py-4 text-center">Estado</th>
+                                <th className="px-6 py-4 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                            {usuarios.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">No hay usuarios registrados.</td>
+                                </tr>
+                            ) : usuarios.map((u: any) => (
+                                <tr key={u.id_usuario} className="hover:bg-gray-50 dark:hover:bg-slate-700/40 transition-colors group">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex items-center justify-center font-black shadow-inner">
+                                                {(u.nombres || u.nombre || 'U').charAt(0).toUpperCase()}
+                                            </div>
                                             <div className="flex flex-col">
-                                                {/* 🟢 CORREGIDO: Índice en lugar de ID real */}
-                                                <span className="font-mono text-gray-400 font-bold text-xs bg-gray-50 dark:bg-slate-700 px-2 py-0.5 rounded-md self-start mb-1">#{index + 1}</span>
-                                                {/* 🟢 CORREGIDO: Muestra nombre correctamente */}
-                                                <h4 className="font-bold text-gray-900 dark:text-gray-100 text-base">{u.nombre}</h4>
-                                                <span className="text-gray-500 text-sm">{u.usuario}</span>
-                                            </div>
-                                            <span className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-xl border bg-blue-50 text-blue-700 border-blue-100">{u.rol}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between border-t dark:border-slate-700 pt-3">
-                                            <span className={`px-2.5 py-1 text-xs font-bold rounded-xl border ${u.estado ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                                {u.estado ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => setUserToReset(u.email || u.usuario)} className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100"><Mail size={16} /></button>
-                                                <button onClick={() => abrirModalEditar(u)} className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100"><Pencil size={16} /></button>
-                                                <button onClick={() => setUserToDelete(u.id_usuario)} className="p-2 bg-red-50 text-red-600 rounded-xl border border-red-100"><Trash2 size={16} /></button>
+                                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                                    {u.nombres || u.nombre} {u.apellidos}
+                                                    {/* Rótulo V2 de Superadmin para el ID 1 */}
+                                                    {u.id_usuario === 1 && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black uppercase">Superadmin</span>}
+                                                </span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{u.email || u.usuario}</span>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* VISTA ESCRITORIO */}
-                            <div className="overflow-x-auto hidden md:block">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-gray-50 dark:bg-slate-800/80 text-xs uppercase text-gray-500 font-bold border-b dark:border-slate-700">
-                                        <tr>
-                                            <th className="px-6 py-4">N°</th>
-                                            <th className="px-6 py-4">Nombre Completo</th>
-                                            <th className="px-6 py-4">Usuario</th>
-                                            <th className="px-6 py-4">Rol</th>
-                                            <th className="px-6 py-4">Estado</th>
-                                            <th className="px-6 py-4 text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y dark:divide-slate-700">
-                                        {listaUsuarios.map((u, index) => (
-                                            <tr key={u.id_usuario} className="hover:bg-gray-50 dark:hover:bg-slate-700/40 transition-colors">
-                                                {/* 🟢 CORREGIDO: Índice en lugar de ID real */}
-                                                <td className="px-6 py-4 font-mono text-gray-400 font-bold">#{index + 1}</td>
-                                                {/* 🟢 CORREGIDO: Muestra nombre correctamente */}
-                                                <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{u.nombre}</td>
-                                                <td className="px-6 py-4 text-gray-500 dark:text-gray-300">{u.usuario}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border shadow-sm ${u.rol === 'Administrador' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                                            u.rol === 'Supervisor' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                                'bg-gray-50 text-gray-600 border-gray-200'
-                                                        }`}>
-                                                        {u.rol}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-3 py-1 text-xs font-bold rounded-full border ${u.estado ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                                                        {u.estado ? 'Activo' : 'Inactivo'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button onClick={() => setUserToReset(u.email || u.usuario)} className="p-2 hover:bg-amber-50 text-amber-600 rounded-lg transition-colors" title="Enviar Recuperación"><Mail size={18} /></button>
-                                                        <button onClick={() => abrirModalEditar(u)} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Editar"><Pencil size={18} /></button>
-                                                        <button onClick={() => setUserToDelete(u.id_usuario)} className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors" title="Eliminar"><Trash2 size={18} /></button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-gray-800 dark:text-gray-200">{u.cargo || '-'}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">{u.area || '-'}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`inline-flex px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg border shadow-sm ${
+                                            u.rol?.toLowerCase() === 'administrador' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800/50' : 
+                                            u.rol?.toLowerCase() === 'capacitador' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50' : 
+                                            'bg-gray-50 text-gray-600 border-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:border-slate-600'
+                                        }`}>
+                                            {u.rol}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1"><Building2 size={12} /> {u.id_sede ? 'Sede Específica' : 'Todas las Sedes'}</span>
+                                            <span className="text-xs text-gray-500 flex items-center gap-1"><Box size={12} /> {u.id_alcance ? 'Alcance Restringido' : 'Acceso Global'}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg border ${u.estado !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20' : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20'}`}>
+                                            {u.estado !== false ? 'Activo' : 'Baja'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleReenviarInvitacion(u.email || u.usuario)} className="p-2 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-600 rounded-lg transition-colors" title="Enviar Acceso"><Mail size={18} /></button>
+                                            <button onClick={() => handleOpenModal(u)} className="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 text-blue-600 rounded-lg transition-colors" title="Editar Permisos"><Pencil size={18} /></button>
+                                            <button onClick={() => setUserToDelete(u.id_usuario)} className="p-2 hover:bg-red-50 dark:hover:bg-slate-700 text-red-600 rounded-lg transition-colors" title="Revocar Acceso"><Trash2 size={18} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            {/* 🟢 MODAL PROFESIONAL: CONFIRMAR ELIMINAR */}
-            {userToDelete !== null && (
-                <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-                        <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Trash2 size={32} />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">¿Eliminar Usuario?</h3>
-                            <p className="text-slate-500 text-sm">Esta acción es permanente y todos sus datos de acceso serán borrados. ¿Deseas continuar?</p>
-                        </div>
-                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 flex gap-3">
-                            <button onClick={() => setUserToDelete(null)} className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                Cancelar
-                            </button>
-                            <button onClick={confirmEliminar} className="flex-1 py-2.5 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg shadow-red-500/20">
-                                Sí, Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 🟢 MODAL PROFESIONAL: CONFIRMAR RESETEO */}
-            {userToReset !== null && (
-                <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-                        <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Mail size={32} />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Restablecer Acceso</h3>
-                            <p className="text-slate-500 text-sm mb-2">Se enviará un correo a <strong>{userToReset}</strong> con un enlace único para cambiar la contraseña.</p>
-                        </div>
-                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 flex gap-3">
-                            <button onClick={() => setUserToReset(null)} className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                Cancelar
-                            </button>
-                            <button onClick={confirmReset} className="flex-1 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
-                                Enviar Correo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL CREAR/EDITAR (Mantenido intacto) */}
+            {/* MODAL CREAR / EDITAR ROL V2 */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-4 border-b dark:border-slate-700 flex justify-between items-center">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/50 shrink-0">
                             <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
-                                {modoEdicion ? <Pencil size={20} className="text-blue-600" /> : <UserPlus size={20} className="text-blue-600" />}
-                                {modoEdicion ? 'Editar Usuario' : 'Nuevo Usuario'}
+                                {editingId ? <Pencil size={20} className="text-blue-600" /> : <UserPlus size={20} className="text-blue-600" />}
+                                {editingId ? 'Editar Permisos de Usuario' : 'Asignar Nuevo Rol'}
                             </h3>
                             <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-red-500"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Nombre Completo</label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-2.5 text-gray-400 dark:text-gray-500" size={18} />
-                                    <input type="text" name="nombre" value={formData.nombre} onChange={handleInputChange} className="w-full border dark:border-slate-600 rounded-lg pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:text-white" placeholder="Ej: Juan Perez" required />
+                        
+                        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+                            
+                            {/* SECCIÓN 1: ROL Y CORREO */}
+                            <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-5 rounded-2xl">
+                                <h4 className="text-[10px] font-black uppercase text-blue-800 dark:text-blue-400 tracking-widest mb-4">1. Identidad y Nivel de Acceso</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Nivel de Rol <span className="text-red-500">*</span></label>
+                                        <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value})} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white font-bold text-blue-700 dark:text-blue-400">
+                                            <option value="Administrador">Administrador (Acceso Total)</option>
+                                            <option value="Capacitador">Capacitador (Ejecuta Actas)</option>
+                                            <option value="Auditor">Auditor (Solo Lectura)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Correo Electrónico <span className="text-red-500">*</span></label>
+                                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white" placeholder="usuario@empresa.com" required />
+                                    </div>
                                 </div>
                             </div>
+
+                            {/* SECCIÓN 2: DATOS PERSONALES */}
                             <div>
-                                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Correo Electrónico</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="ejemplo@correo.com" required={!modoEdicion} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Usuario (Login)</label>
-                                    <input type="text" name="usuario" value={formData.usuario} onChange={handleInputChange} className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="ej: jperez" required />
+                                <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4 border-b border-gray-100 dark:border-slate-700 pb-2">2. Datos del Colaborador</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombres</label>
+                                        <input type="text" value={formData.nombres} onChange={e => setFormData({...formData, nombres: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Apellidos</label>
+                                        <input type="text" value={formData.apellidos} onChange={e => setFormData({...formData, apellidos: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Rol</label>
-                                    <div className="relative">
-                                        <Shield className="absolute left-3 top-2.5 text-gray-400 dark:text-gray-500" size={16} />
-                                        <select name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                                            <option value="Administrador">Administrador</option>
-                                            <option value="Supervisor">Supervisor</option>
-                                            <option value="Auditor">Auditor</option>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cargo</label>
+                                        <input type="text" value={formData.cargo} onChange={e => setFormData({...formData, cargo: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Área</label>
+                                        <input type="text" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 3: ASIGNACIÓN DE SEDE Y ALCANCE (V2) */}
+                            <div>
+                                <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4 border-b border-gray-100 dark:border-slate-700 pb-2">3. Restricción Operativa (Multitenancy)</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1"><Building2 size={12}/> Asignar Sede</label>
+                                        <select value={formData.id_sede} onChange={e => setFormData({...formData, id_sede: e.target.value, id_alcance: ''})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm">
+                                            <option value="">-- Acceso a todas las sedes --</option>
+                                            {sedes.map(s => <option key={s.id_sede} value={s.id_sede}>{s.nombre}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1"><Box size={12}/> Asignar Alcance</label>
+                                        <select disabled={!formData.id_sede} value={formData.id_alcance} onChange={e => setFormData({...formData, id_alcance: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm disabled:opacity-50">
+                                            <option value="">-- Acceso a todos los alcances --</option>
+                                            {alcancesDisponibles.map((a: any) => <option key={a.id_alcance} value={a.id_alcance}>{a.nombre}</option>)}
                                         </select>
                                     </div>
                                 </div>
+                                {formData.id_sede && !formData.id_alcance && (
+                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+                                        <AlertCircle size={12} /> Si dejas el alcance en blanco, el usuario podrá ver todos los alcances de la sede seleccionada.
+                                    </p>
+                                )}
                             </div>
-                            {modoEdicion ? (
-                                <div>
-                                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Estado</label>
-                                    <select name="estado" value={String(formData.estado)} onChange={handleInputChange} className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">
-                                        <option value="true">Activo</option>
-                                        <option value="false">Inactivo</option>
+
+                            {/* ESTADO (Solo al editar) */}
+                            {editingId && (
+                                <div className="pt-2">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Estado del Acceso</label>
+                                    <select value={String(formData.estado)} onChange={e => setFormData({...formData, estado: e.target.value === 'true'})} className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm">
+                                        <option value="true">Activo (Puede iniciar sesión)</option>
+                                        <option value="false">Dado de Baja (Acceso revocado)</option>
                                     </select>
                                 </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Contraseña</label>
-                                    <div className="relative group/pass">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400 dark:text-gray-500">
-                                            <Lock size={18} />
-                                        </div>
-                                        <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ingresa la contraseña" required />
-                                    </div>
-                                </div>
                             )}
-                            <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border dark:border-slate-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex justify-center items-center gap-2"><Save size={18} /> {modoEdicion ? 'Actualizar' : 'Guardar'}</button>
+
+                            <div className="pt-6 flex gap-3 border-t border-gray-100 dark:border-slate-700 shrink-0">
+                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl font-bold transition-colors">Cancelar</button>
+                                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50">
+                                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} {editingId ? 'Actualizar Permisos' : 'Crear y Enviar Acceso'}
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* MODAL INVITACIÓN (Mantenido intacto) */}
-            {showInviteModal && (
-                <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-5 bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-700 flex justify-between items-center">
-                            <h3 className="font-bold flex items-center gap-2 dark:text-white"><Mail className="text-blue-600" size={20} /> Invitar Colaborador</h3>
-                            <button onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-red-500"><X size={24} /></button>
-                        </div>
-                        <div className="p-8 space-y-6">
-                            <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => setInviteData({ ...inviteData, rol: 'Supervisor' })} className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${inviteData.rol === 'Supervisor' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 dark:border-slate-700 text-slate-500'}`}><Shield size={20} /><span className="font-bold text-sm">Supervisor</span></button>
-                                <button onClick={() => setInviteData({ ...inviteData, rol: 'Auditor' })} className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${inviteData.rol === 'Auditor' ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100 dark:border-slate-700 text-slate-500'}`}><User size={20} /><span className="font-bold text-sm">Auditor</span></button>
+            {/* MODAL ELIMINAR */}
+            {userToDelete !== null && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={32} />
                             </div>
-                            <input type="email" value={inviteData.email} onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })} className="w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900/50 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white" placeholder="ejemplo@correo.com" />
-                            <button onClick={handleFinalInvite} disabled={!inviteData.email} className="w-full bg-slate-900 dark:bg-blue-600 text-white rounded-xl py-4 font-bold shadow-xl active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2">Enviar Invitación <CheckCircle2 size={18} /></button>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">¿Revocar Acceso?</h3>
+                            <p className="text-slate-500 text-sm">Esta acción es permanente y el usuario no podrá ingresar al sistema.</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 flex gap-3">
+                            <button onClick={() => setUserToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                            <button onClick={confirmEliminar} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/20 transition-all active:scale-95">Sí, Revocar</button>
                         </div>
                     </div>
                 </div>
